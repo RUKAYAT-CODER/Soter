@@ -7,11 +7,16 @@ import {
 } from './onchain.module';
 import { OnchainAdapter } from './onchain.adapter';
 import { MockOnchainAdapter } from './onchain.adapter.mock';
+import { SorobanOnchainAdapter } from './soroban-onchain.adapter';
+import * as StellarSdk from '@stellar/stellar-sdk';
 
 describe('OnchainModule', () => {
   let module: TestingModule;
 
   beforeEach(async () => {
+    // Generate a valid keypair for testing
+    const keypair = StellarSdk.Keypair.random();
+    
     module = await Test.createTestingModule({
       imports: [
         ConfigModule.forRoot({
@@ -26,11 +31,27 @@ describe('OnchainModule', () => {
           useClass: MockOnchainAdapter,
         },
       ],
-    }).compile();
+    })
+    .overrideProvider(ConfigService)
+    .useValue({
+      get: jest.fn((key: string) => {
+        const config = {
+          'ONCHAIN_ADAPTER': 'mock',
+          'SOROBAN_CONTRACT_ID': 'CDLZFC3SYJYDZT7K67VY75FOVPJT4KPNGW22L5XWYUI5ZHQMWUCJY2Q',
+          'STELLAR_SECRET_KEY': keypair.secret(),
+          'STELLAR_RPC_URL': 'https://soroban-testnet.stellar.org',
+          'STELLAR_NETWORK': 'testnet',
+        };
+        return config[key];
+      }),
+    })
+    .compile();
   });
 
   afterEach(async () => {
-    await module.close();
+    if (module) {
+      await module.close();
+    }
   });
 
   it('should be defined', () => {
@@ -81,12 +102,24 @@ describe('createOnchainAdapter', () => {
     expect(adapter).toBeInstanceOf(MockOnchainAdapter);
   });
 
-  it('should throw error when ONCHAIN_ADAPTER is soroban (not implemented)', () => {
-    jest.spyOn(configService, 'get').mockReturnValue('soroban');
+  it('should create SorobanOnchainAdapter when ONCHAIN_ADAPTER is soroban', () => {
+    // Generate a valid keypair for testing
+    const keypair = StellarSdk.Keypair.random();
 
-    expect(() => createOnchainAdapter(configService)).toThrow(
-      'Soroban adapter not yet implemented. Use ONCHAIN_ADAPTER=mock',
-    );
+    jest.spyOn(configService, 'get').mockImplementation((key: string) => {
+      if (key === 'ONCHAIN_ADAPTER') return 'soroban';
+      if (key === 'SOROBAN_CONTRACT_ID')
+        return 'CDLZFC3SYJYDZT7K67VY75FOVPJT4KPNGW22L5XWYUI5ZHQMWUCJY2Q';
+      if (key === 'STELLAR_SECRET_KEY') return keypair.secret();
+      if (key === 'STELLAR_RPC_URL')
+        return 'https://soroban-testnet.stellar.org';
+      if (key === 'STELLAR_NETWORK') return 'testnet';
+      return undefined;
+    });
+
+    const adapter = createOnchainAdapter(configService);
+
+    expect(adapter).toBeInstanceOf(SorobanOnchainAdapter);
   });
 
   it('should throw error when ONCHAIN_ADAPTER is unknown', () => {
