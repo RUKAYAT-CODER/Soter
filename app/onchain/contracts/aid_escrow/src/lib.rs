@@ -994,8 +994,8 @@ impl AidEscrow {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use soroban_sdk::testutils::Address as _;
     use soroban_sdk::Env;
+    use soroban_sdk::testutils::Address as _;
 
     fn setup() -> (Env, AidEscrowClient<'static>) {
         let env = Env::default();
@@ -1015,8 +1015,7 @@ mod tests {
         env.mock_all_auths();
         client.init(&admin);
 
-        let package_id =
-            client.create_package(&operator, &1, &recipient, &1000, &token, &86400);
+        let package_id = client.create_package(&operator, &1, &recipient, &1000, &token, &86400);
         client.cancel_package(&package_id);
 
         let package = client.get_package(&package_id);
