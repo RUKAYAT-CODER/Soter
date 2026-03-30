@@ -54,6 +54,10 @@ export class CampaignsController {
   }
 
   @Get()
+  @ApiOperation({
+    summary: 'List all campaigns',
+    description: 'Retrieves a list of all active or archived campaigns.',
+  })
   @ApiOkResponse({ description: 'List of campaigns retrieved successfully.' })
   @ApiUnauthorizedResponse({
     description: 'Missing or invalid authentication credentials.',
@@ -67,6 +71,10 @@ export class CampaignsController {
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Get campaign details',
+    description: 'Retrieves metadata and status for a specific campaign.',
+  })
   @ApiOkResponse({ description: 'Campaign details retrieved successfully.' })
   @ApiNotFoundResponse({ description: 'The specified campaign was not found.' })
   @ApiUnauthorizedResponse({
@@ -78,6 +86,11 @@ export class CampaignsController {
   }
 
   @Patch(':id')
+  @ApiOperation({
+    summary: 'Update a campaign',
+    description:
+      'Modifies existing campaign properties. Only provided fields are updated.',
+  })
   @ApiOkResponse({ description: 'Campaign updated successfully.' })
   @ApiNotFoundResponse({ description: 'The specified campaign was not found.' })
   @ApiBadRequestResponse({
@@ -94,6 +107,7 @@ export class CampaignsController {
     return ApiResponseDto.ok(updateData, 'Campaign updated successfully');
   }
 
+  @Patch(':id/archive')
   @ApiOperation({
     summary: 'Archive campaign (soft archive)',
     description:
