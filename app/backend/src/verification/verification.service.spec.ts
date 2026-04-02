@@ -6,6 +6,7 @@ import { HttpService } from '@nestjs/axios';
 import { VerificationService } from './verification.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { ClaimStatus, Prisma } from '@prisma/client';
 import { of } from 'rxjs';
 
 describe('VerificationService', () => {
@@ -21,11 +22,14 @@ describe('VerificationService', () => {
 
   const mockClaim = {
     id: 'test-claim-id',
-    status: 'pending',
+    status: ClaimStatus.requested,
     description: 'Test claim',
     createdAt: new Date(),
     updatedAt: new Date(),
-    verificationScore: null,
+    campaignId: 'test-campaign-id',
+    amount: new Prisma.Decimal(100.0),
+    recipientRef: 'test-recipient',
+    evidenceRef: 'test-evidence',
     verificationResult: null,
     verifiedAt: null,
     metadata: null,
@@ -128,7 +132,7 @@ describe('VerificationService', () => {
     });
 
     it('should skip enqueuing for already verified claims', async () => {
-      const verifiedClaim = { ...mockClaim, status: 'verified' };
+      const verifiedClaim = { ...mockClaim, status: ClaimStatus.verified };
       jest
         .spyOn(prismaService.claim, 'findUnique')
         .mockResolvedValue(verifiedClaim);
@@ -149,8 +153,7 @@ describe('VerificationService', () => {
         .spyOn(prismaService.claim, 'update')
         .mockResolvedValue({
           ...mockClaim,
-          status: 'verified',
-          verificationScore: 0.85,
+          status: ClaimStatus.verified,
         });
 
       const result = await service.processVerification({
@@ -196,7 +199,7 @@ describe('VerificationService', () => {
         .spyOn(prismaService.claim, 'update')
         .mockResolvedValue({
           ...mockClaim,
-          status: 'verified',
+          status: ClaimStatus.verified,
         });
 
       await service.processVerification({

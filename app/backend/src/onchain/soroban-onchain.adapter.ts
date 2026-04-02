@@ -10,6 +10,21 @@ import {
   CreateClaimResult,
   DisburseParams,
   DisburseResult,
+  CreateAidPackageParams,
+  CreateAidPackageResult,
+  BatchCreateAidPackagesParams,
+  BatchCreateAidPackagesResult,
+  ClaimAidPackageParams,
+  ClaimAidPackageResult,
+  DisburseAidPackageParams,
+  DisburseAidPackageResult,
+  GetAidPackageParams,
+  GetAidPackageResult,
+  GetAidPackageCountParams,
+  GetAidPackageCountResult,
+  AidPackage,
+  GetTokenBalanceParams,
+  GetTokenBalanceResult,
 } from './onchain.adapter';
 
 /**
@@ -45,7 +60,8 @@ export class SorobanOnchainAdapter implements OnchainAdapter {
     }
 
     this.server = new StellarSdk.SorobanRpc.Server(rpcUrl, {
-      allowHttp: process.env.NODE_ENV === 'development',
+      allowHttp:
+        process.env.NODE_ENV === 'development' || rpcUrl.startsWith('http://'),
     });
 
     this.contractId = this._configService.get<string>(
@@ -493,5 +509,255 @@ export class SorobanOnchainAdapter implements OnchainAdapter {
       this.logger.warn(`Failed to extract amount: ${error.message}`);
       return fallbackAmount || '0';
     }
+  }
+
+  // Implement the remaining required methods from OnchainAdapter interface
+  async createAidPackage(
+    params: CreateAidPackageParams,
+  ): Promise<CreateAidPackageResult> {
+    // For now, delegate to createClaim for backward compatibility
+    const claimParams: CreateClaimParams = {
+      claimId: params.packageId,
+      recipientAddress: params.recipientAddress,
+      amount: params.amount,
+      tokenAddress: params.tokenAddress,
+      expiresAt: params.expiresAt,
+    };
+
+    const result = await this.createClaim(claimParams);
+    return {
+      packageId: result.packageId,
+      transactionHash: result.transactionHash,
+      timestamp: result.timestamp,
+      status: result.status,
+      metadata: result.metadata,
+    };
+  }
+
+  async batchCreateAidPackages(
+    params: BatchCreateAidPackagesParams,
+  ): Promise<BatchCreateAidPackagesResult> {
+    this.logger.log(
+      `Creating batch aid packages for ${params.recipientAddresses.length} recipients`,
+    );
+
+    try {
+      // For now, create packages individually (could be optimized with actual contract batch operation)
+      const packageIds: string[] = [];
+      let transactionHash = '';
+
+      for (let i = 0; i < params.recipientAddresses.length; i++) {
+        const packageParams: CreateAidPackageParams = {
+          operatorAddress: params.operatorAddress,
+          packageId: `${Date.now()}_${i}`,
+          recipientAddress: params.recipientAddresses[i],
+          amount: params.amounts[i],
+          tokenAddress: params.tokenAddress,
+          expiresAt: Math.floor(Date.now() / 1000) + params.expiresIn,
+        };
+
+        const result = await this.createAidPackage(packageParams);
+        packageIds.push(result.packageId);
+
+        if (i === 0) {
+          transactionHash = result.transactionHash;
+        }
+      }
+
+      return {
+        packageIds,
+        transactionHash,
+        timestamp: new Date(),
+        status: 'success',
+        metadata: {
+          count: params.recipientAddresses.length,
+          tokenAddress: params.tokenAddress,
+          adapter: 'soroban',
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `batchCreateAidPackages failed: ${error.message}`,
+        error.stack,
+      );
+      return {
+        packageIds: [],
+        transactionHash: '',
+        timestamp: new Date(),
+        status: 'failed',
+        metadata: {
+          error: error.message,
+          adapter: 'soroban',
+        },
+      };
+    }
+  }
+
+  async claimAidPackage(
+    params: ClaimAidPackageParams,
+  ): Promise<ClaimAidPackageResult> {
+    this.logger.log(
+      `Claiming aid package: ${params.packageId} for recipient: ${params.recipientAddress}`,
+    );
+
+    try {
+      // This would call the contract's claim method
+      // For now, return a mock response similar to disburse
+      const transactionHash = this.generateMockHash(
+        `claim-${params.packageId}-${params.recipientAddress}-${Date.now()}`,
+      );
+
+      await Promise.resolve(); // Placeholder for future implementation
+
+      return {
+        packageId: params.packageId,
+        transactionHash,
+        timestamp: new Date(),
+        status: 'success',
+        amountClaimed: '1000000000', // Would come from contract result
+        metadata: {
+          packageId: params.packageId,
+          recipientAddress: params.recipientAddress,
+          adapter: 'soroban',
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `claimAidPackage failed: ${error.message}`,
+        error.stack,
+      );
+      return {
+        packageId: params.packageId,
+        transactionHash: '',
+        timestamp: new Date(),
+        status: 'failed',
+        amountClaimed: '0',
+        metadata: {
+          error: error.message,
+          adapter: 'soroban',
+        },
+      };
+    }
+  }
+
+  async disburseAidPackage(
+    params: DisburseAidPackageParams,
+  ): Promise<DisburseAidPackageResult> {
+    // Delegate to the existing disburse method for backward compatibility
+    const disburseParams: DisburseParams = {
+      claimId: params.packageId, // Use packageId as claimId for compatibility
+      packageId: params.packageId,
+      tokenAddress: '', // Would need to be provided or looked up
+    };
+
+    const result = await this.disburse(disburseParams);
+    return {
+      packageId: params.packageId,
+      transactionHash: result.transactionHash,
+      timestamp: result.timestamp,
+      status: result.status,
+      amountDisbursed: result.amountDisbursed,
+      metadata: result.metadata,
+    };
+  }
+
+  async getAidPackage(
+    params: GetAidPackageParams,
+  ): Promise<GetAidPackageResult> {
+    this.logger.log(`Getting aid package: ${params.packageId}`);
+
+    try {
+      // This would call the contract's get_package method
+      // For now, return a mock response
+      const mockPackage: AidPackage = {
+        id: params.packageId,
+        recipient: 'GBUQWP3BOUZX34ULNQG23RQ6F4BFXWBTRSE53XSTE23JMCVOCJGXVSVZ',
+        amount: '1000000000',
+        token: 'GATEMHCCKCY67ZUCKTROYN24ZYT5GK4EQZ5LKG3FZTSZ3NYNEJBBENSN',
+        status: 'Created',
+        createdAt: Math.floor(Date.now() / 1000),
+        expiresAt: Math.floor(Date.now() / 1000) + 86400 * 30,
+        metadata: {
+          campaign_ref: 'campaign-123',
+        },
+      };
+
+      await Promise.resolve(); // Placeholder for future implementation
+
+      return {
+        package: mockPackage,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error(`getAidPackage failed: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async getAidPackageCount(
+    params: GetAidPackageCountParams,
+  ): Promise<GetAidPackageCountResult> {
+    this.logger.log(
+      `Getting aid package aggregates for token: ${params.token}`,
+    );
+
+    try {
+      // This would call the contract's get_aggregates method
+      await Promise.resolve(); // Placeholder for future implementation
+
+      return {
+        aggregates: {
+          totalCommitted: '5000000000',
+          totalClaimed: '2000000000',
+          totalExpiredCancelled: '500000000',
+        },
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `getAidPackageCount failed: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  async getTokenBalance(
+    params: GetTokenBalanceParams,
+  ): Promise<GetTokenBalanceResult> {
+    this.logger.log(
+      `Getting token balance for account: ${params.accountAddress}`,
+    );
+
+    try {
+      // This would call the token contract's balance method
+      await Promise.resolve(); // Placeholder for future implementation
+
+      const mockBalance = this.generateMockBalance(params.tokenAddress);
+
+      return {
+        tokenAddress: params.tokenAddress,
+        accountAddress: params.accountAddress,
+        balance: mockBalance,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `getTokenBalance failed: ${error.message}`,
+        error.stack,
+      );
+      throw error;
+    }
+  }
+
+  private generateMockHash(input: string): string {
+    const hash = createHash('sha256').update(input).digest('hex');
+    return hash.substring(0, 64).toUpperCase();
+  }
+
+  private generateMockBalance(tokenAddress: string): string {
+    const hash = createHash('sha256').update(tokenAddress).digest('hex');
+    const balanceValue = parseInt(hash.substring(0, 10), 16);
+    return balanceValue.toString();
   }
 }

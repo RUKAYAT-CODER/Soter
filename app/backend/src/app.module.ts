@@ -31,6 +31,8 @@ import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { LoggerService } from './logger/logger.service';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { AidEscrowModule } from './onchain/aid-escrow.module';
 
 @Module({
   imports: [
@@ -73,6 +75,13 @@ import { AnalyticsModule } from './analytics/analytics.module';
     NotificationsModule,
     JobsModule,
     AnalyticsModule,
+    AidEscrowModule,
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 seconds window
+        limit: 20, // default: 20 req/min
+      },
+    ]),
   ],
 
   controllers: [AppController],
@@ -93,6 +102,10 @@ import { AnalyticsModule } from './analytics/analytics.module';
     {
       provide: APP_INTERCEPTOR,
       useClass: LoggingInterceptor,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard, // rate-limiting guard runs after auth and role checks to avoid unnecessary counting of unauthenticated/unauthorized requests
     },
   ],
 })

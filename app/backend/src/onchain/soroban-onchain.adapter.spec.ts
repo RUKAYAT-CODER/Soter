@@ -10,7 +10,7 @@ jest.mock('@stellar/stellar-sdk', () => {
     ...actual,
     SorobanRpc: {
       ...actual.SorobanRpc,
-      Server: jest.fn().mockImplementation((url, options) => ({
+      Server: jest.fn().mockImplementation((_url, _options) => ({
         getAccount: jest.fn(),
         simulateTransaction: jest.fn(),
         sendTransaction: jest.fn(),
@@ -18,7 +18,7 @@ jest.mock('@stellar/stellar-sdk', () => {
       })),
       assembleTransaction: jest
         .fn()
-        .mockImplementation((tx, simulationResponse) => {
+        .mockImplementation((tx, _simulationResponse) => {
           return {
             ...tx,
             signatures: [],
@@ -79,7 +79,7 @@ describe('SorobanOnchainAdapter', () => {
 
   // Generate a test keypair before the mocks are set up
   beforeAll(() => {
-    const StellarSdk = jest.requireActual('@stellar/stellar-sdk') as any;
+    const StellarSdk = jest.requireActual('@stellar/stellar-sdk');
     testKeypair = StellarSdk.Keypair.random();
   });
 
@@ -226,7 +226,7 @@ describe('SorobanOnchainAdapter', () => {
 
     it('should successfully initialize escrow', async () => {
       const result = await adapter.initEscrow(mockParams);
-      
+
       expect(result.status).toBe('success');
       expect(result.escrowAddress).toBe(mockConfig.SOROBAN_CONTRACT_ID);
       expect(result.transactionHash).toBe('tx_hash_123456');
@@ -364,6 +364,7 @@ describe('SorobanOnchainAdapter', () => {
       packageId: 'pkg_123',
       recipientAddress: 'GRECIPIENTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
       amount: '1000000000',
+      tokenAddress: 'GDEMO TOKEN ADDRESS',
     };
 
     beforeEach(() => {
